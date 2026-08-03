@@ -134,6 +134,12 @@ configuration. It preserves the installation's `.env` settings while changing
 health check. Set `FILESERVER_UPDATE_HEALTH_TIMEOUT_SECONDS` to a positive
 number to override the default 180-second wait.
 
+To bootstrap an installation from before deployment kits included the updater,
+copy the current `update-fileserver.sh` into the installation directory and run
+it normally. If the target release kit has no updater, the script retains its
+installed copy instead of failing. A later release kit that contains an updater
+replaces it with that release's versioned copy.
+
 The updater does **not** back up persistent volumes. Volume backups are a
 separate operator responsibility and are required before every upgrade whose
 release notes include a schema change. Back up all three volumes as one

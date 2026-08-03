@@ -68,9 +68,13 @@ expected_name="${expected_name#\*}"
 readonly KIT_DIR="${TEMP_DIR}/kit"
 mkdir "$KIT_DIR"
 tar -xzf "${TEMP_DIR}/${ARCHIVE}" -C "$KIT_DIR"
-for kit_file in compose.yaml .env.example update-fileserver.sh; do
+for kit_file in compose.yaml .env.example; do
   [[ -f "${KIT_DIR}/${kit_file}" ]] || fail "Deployment kit is missing ${kit_file}."
 done
+
+if [[ ! -f "${KIT_DIR}/update-fileserver.sh" ]]; then
+  printf 'Release %s predates the bundled updater; keeping the installed updater.\n' "$VERSION"
+fi
 
 readonly NEXT_ENV="${TEMP_DIR}/.env"
 awk -v version="$VERSION" '
@@ -91,7 +95,9 @@ docker compose --env-file "$NEXT_ENV" -f "${KIT_DIR}/compose.yaml" config --quie
 
 install -m 0644 "${KIT_DIR}/compose.yaml" "${SCRIPT_DIR}/compose.yaml"
 install -m 0644 "${KIT_DIR}/.env.example" "${SCRIPT_DIR}/.env.example"
-install -m 0755 "${KIT_DIR}/update-fileserver.sh" "${SCRIPT_DIR}/update-fileserver.sh"
+if [[ -f "${KIT_DIR}/update-fileserver.sh" ]]; then
+  install -m 0755 "${KIT_DIR}/update-fileserver.sh" "${SCRIPT_DIR}/update-fileserver.sh"
+fi
 install -m 0600 "$NEXT_ENV" "$ENV_FILE"
 
 printf 'Pulling Baharsoft File Server %s...\n' "$VERSION"
