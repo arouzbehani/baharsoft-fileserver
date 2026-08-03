@@ -1,6 +1,6 @@
 {
   "name": "baharsoft-fileserver",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Open-source, self-hosted, multi-tenant document storage service",
   "main": "src/server.js",
   "scripts": {

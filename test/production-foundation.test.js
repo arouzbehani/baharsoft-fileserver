@@ -36,7 +36,7 @@ test("runtime configuration validates and resolves production settings", () => {
   const config = getRuntimeConfig(productionEnv());
 
   assert.equal(config.nodeEnv, "production");
-  assert.equal(config.serviceVersion, "1.0.0");
+  assert.equal(config.serviceVersion, "1.0.1");
   assert.equal(config.port, 8080);
   assert.match(config.dataRoot, /runtime-data$/);
   assert.match(config.storageRoot, /runtime-storage$/);
@@ -94,12 +94,12 @@ test("liveness and readiness endpoints report healthy state", async () => {
     assert.equal(liveResponse.status, 200);
     assert.deepEqual(await liveResponse.json(), {
       status: "ok",
-      version: "1.0.0",
+      version: "1.0.1",
     });
     assert.equal(readyResponse.status, 200);
     assert.deepEqual(await readyResponse.json(), {
       status: "ok",
-      version: "1.0.0",
+      version: "1.0.1",
     });
   });
 });

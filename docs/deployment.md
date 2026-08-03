@@ -72,17 +72,17 @@ docker compose --env-file deploy\.env -f deploy\compose.yaml pull
 docker compose --env-file deploy\.env -f deploy\compose.yaml up -d --wait
 ```
 
-Production installations should pin an exact version such as `1.0.0`, not
+Production installations should pin an exact version such as `1.0.1`, not
 `latest`.
 
 ## Install a release on a Linux server
 
-The following example installs version `1.0.0` under
+The following example installs version `1.0.1` under
 `/opt/baharsoft-fileserver`. Replace the version when installing a newer
 release.
 
 ```bash
-export FILESERVER_VERSION=1.0.0
+export FILESERVER_VERSION=1.0.1
 sudo install -d -o "$USER" -g "$USER" /opt/baharsoft-fileserver
 cd /opt/baharsoft-fileserver
 
