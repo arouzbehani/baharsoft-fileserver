@@ -149,7 +149,7 @@ label, legend { display: grid; gap: .45rem; color: #33444b; font-size: .82rem; f
 .file-status.active { color: #197268; background: #e1f5f1; }
 .file-status.deleted { color: #a46224; background: #fff1df; }
 .file-status.purged { color: #7c8589; background: #edf0ef; }
-.file-actions { top: 2.2rem; }
+.file-actions-portal { position: fixed; z-index: 60; right: auto; width: 180px; }
 .table-empty { display: grid; min-height: 180px; place-items: center; color: #879397; font-size: .75rem; }
 .load-more { display: flex; justify-content: center; padding: 1rem; }
 .file-preview { display: grid; max-height: 360px; margin-top: 1.2rem; overflow: hidden; place-items: center; border: 1px solid #dde4e2; border-radius: .8rem; background: #edf1ef; }
