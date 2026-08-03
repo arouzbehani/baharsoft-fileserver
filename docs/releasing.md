@@ -34,7 +34,8 @@ ghcr.io/arouzbehani/baharsoft-fileserver:latest
 ```
 
 The workflow also creates a GitHub Release containing a Compose deployment kit
-and its SHA-256 checksum. It never connects to or deploys onto a server.
+and its SHA-256 checksum. The kit contains `compose.yaml`, `.env.example`, and
+`update-fileserver.sh`. The workflow never connects to or deploys onto a server.
 
 ## Release safety
 
