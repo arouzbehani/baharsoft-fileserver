@@ -1,4 +1,5 @@
-import { useCallback, useEffect, useState, type FormEvent } from "react"
+import { useCallback, useEffect, useState, type FormEvent, type MouseEvent } from "react"
+import { createPortal } from "react-dom"
 import { Copy, File, FileImage, FileText, Filter, FolderOpen, MoreHorizontal, Plus, RefreshCw, RotateCcw, Search, Trash2 } from "lucide-react"
 import { FileDetailsDialog } from "@/components/FileDetailsDialog"
 import { PurgeFileDialog } from "@/components/PurgeFileDialog"
@@ -27,6 +28,7 @@ function iconFor(file: AdminFile) {
 }
 
 interface Props { tenants: string[]; onChanged: () => Promise<void> }
+interface FileMenu { documentId: string; top: number; left: number }
 
 export function FilesView({ tenants, onChanged }: Props) {
   const [tenant, setTenant] = useState(tenants[0] || "")
@@ -42,7 +44,7 @@ export function FilesView({ tenants, onChanged }: Props) {
   const [uploadOpen, setUploadOpen] = useState(false)
   const [selected, setSelected] = useState<AdminFile | null>(null)
   const [purging, setPurging] = useState<AdminFile | null>(null)
-  const [menu, setMenu] = useState<string | null>(null)
+  const [menu, setMenu] = useState<FileMenu | null>(null)
 
   useEffect(() => {
     if (!tenant && tenants.length) setTenant(tenants[0])
@@ -61,6 +63,20 @@ export function FilesView({ tenants, onChanged }: Props) {
   }, [tenant, search, folder, status, visibility, tagText, nextCursor])
 
   useEffect(() => { void load(false) }, [tenant, status, visibility])
+
+  useEffect(() => {
+    if (!menu) return
+    const close = () => setMenu(null)
+    const closeOnEscape = (event: KeyboardEvent) => { if (event.key === "Escape") close() }
+    window.addEventListener("resize", close)
+    window.addEventListener("scroll", close, true)
+    window.addEventListener("keydown", closeOnEscape)
+    return () => {
+      window.removeEventListener("resize", close)
+      window.removeEventListener("scroll", close, true)
+      window.removeEventListener("keydown", closeOnEscape)
+    }
+  }, [menu])
 
   function applyFilters(event: FormEvent) {
     event.preventDefault()
@@ -102,7 +118,29 @@ export function FilesView({ tenants, onChanged }: Props) {
     finally { setBusy(false) }
   }
 
-  return <section className="files-workspace">
+  function toggleMenu(event: MouseEvent<HTMLButtonElement>, file: AdminFile) {
+    event.stopPropagation()
+    if (menu?.documentId === file.documentId) { setMenu(null); return }
+
+    const anchor = event.currentTarget.getBoundingClientRect()
+    const viewportPadding = 8
+    const gap = 6
+    const width = 180
+    const height = file.status === "deleted" ? 116 : file.status === "active" ? 82 : 50
+    const opensAbove = window.innerHeight - anchor.bottom < height + gap && anchor.top > height + gap
+    const top = opensAbove
+      ? Math.max(viewportPadding, anchor.top - height - gap)
+      : Math.min(window.innerHeight - height - viewportPadding, anchor.bottom + gap)
+    const left = Math.min(
+      window.innerWidth - width - viewportPadding,
+      Math.max(viewportPadding, anchor.right - width),
+    )
+    setMenu({ documentId: file.documentId, top, left })
+  }
+
+  const menuFile = menu ? files.find((file) => file.documentId === menu.documentId) : null
+
+  return <section className="files-workspace" onClick={() => setMenu(null)}>
     <div className="section-heading files-heading"><div><p className="eyebrow">Storage operations</p><h2>Files</h2><p>Inspect and control documents without adding project-specific relationships.</p></div><Button disabled={!tenant} onClick={() => setUploadOpen(true)}><Plus />Upload file</Button></div>
     {!tenants.length ? <div className="empty-state"><div><FolderOpen /></div><h3>No tenants configured</h3><p>Create a service client with a tenant before uploading files.</p></div> : <>
       <form className="file-toolbar" onSubmit={applyFilters}>
@@ -126,17 +164,18 @@ export function FilesView({ tenants, onChanged }: Props) {
             <td>{formatBytes(file.size)}</td>
             <td>{new Date(file.uploadedAt).toLocaleDateString()}</td>
             <td><span className={`file-status ${file.status}`}>{file.status}</span></td>
-            <td><div className="row-menu"><Button variant="ghost" size="icon" onClick={(event) => { event.stopPropagation(); setMenu(menu === file.documentId ? null : file.documentId) }} aria-label={`Actions for ${file.originalName}`}><MoreHorizontal /></Button>{menu === file.documentId && <div className="menu-popover file-actions">
-              <button onClick={(event) => { event.stopPropagation(); void navigator.clipboard.writeText(file.documentId); setMenu(null) }}><Copy />Copy document ID</button>
-              {file.status === "active" && <button className="danger" onClick={(event) => { event.stopPropagation(); setMenu(null); void remove(file) }}><Trash2 />Delete</button>}
-              {file.status === "deleted" && <><button onClick={(event) => { event.stopPropagation(); setMenu(null); void restore(file) }}><RotateCcw />Restore</button><button className="danger" onClick={(event) => { event.stopPropagation(); setMenu(null); setPurging(file) }}><Trash2 />Purge</button></>}
-            </div>}</div></td>
+            <td><div className="row-menu"><Button variant="ghost" size="icon" onClick={(event) => toggleMenu(event, file)} aria-haspopup="menu" aria-expanded={menu?.documentId === file.documentId} aria-label={`Actions for ${file.originalName}`}><MoreHorizontal /></Button></div></td>
           </tr>)}</tbody>
         </table>
         {!busy && !files.length && <div className="table-empty">No files match these filters.</div>}
       </div>
       {nextCursor && <div className="load-more"><Button variant="secondary" disabled={busy} onClick={() => void load(true)}>{busy ? "Loading…" : "Load more"}</Button></div>}
     </>}
+    {menu && menuFile && createPortal(<div className="menu-popover file-actions-portal" role="menu" style={{ top: menu.top, left: menu.left }} onClick={(event) => event.stopPropagation()}>
+      <button type="button" role="menuitem" onClick={() => { void navigator.clipboard.writeText(menuFile.documentId); setMenu(null) }}><Copy />Copy document ID</button>
+      {menuFile.status === "active" && <button type="button" role="menuitem" className="danger" onClick={() => { setMenu(null); void remove(menuFile) }}><Trash2 />Delete</button>}
+      {menuFile.status === "deleted" && <><button type="button" role="menuitem" onClick={() => { setMenu(null); void restore(menuFile) }}><RotateCcw />Restore</button><button type="button" role="menuitem" className="danger" onClick={() => { setMenu(null); setPurging(menuFile) }}><Trash2 />Purge</button></>}
+    </div>, document.body)}
     <UploadFileDialog open={uploadOpen} tenant={tenant} busy={busy} error={error} onOpenChange={setUploadOpen} onUpload={upload} />
     <FileDetailsDialog file={selected} busy={busy} onClose={() => setSelected(null)} onDelete={remove} onRestore={restore} onPurge={(file) => { setSelected(null); setPurging(file) }} />
     <PurgeFileDialog file={purging} busy={busy} onClose={() => setPurging(null)} onConfirm={purge} />
