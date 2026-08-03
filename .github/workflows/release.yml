@@ -78,6 +78,9 @@ jobs:
           FILESERVER_ADMIN_BOOTSTRAP_TOKEN: release-bootstrap-token-12345678901234567890
         run: docker compose -f deploy/compose.yaml config --quiet
 
+      - name: Validate deployment updater
+        run: bash -n deploy/update-fileserver.sh
+
   publish:
     name: Publish release
     needs: verify
@@ -138,9 +141,10 @@ jobs:
           mkdir release-kit
           cp deploy/compose.yaml release-kit/compose.yaml
           cp deploy/.env.example release-kit/.env.example
+          install -m 0755 deploy/update-fileserver.sh release-kit/update-fileserver.sh
           sed -i "s/^FILESERVER_VERSION=.*/FILESERVER_VERSION=${VERSION}/" release-kit/.env.example
           ARCHIVE="baharsoft-fileserver-${VERSION}-deploy.tar.gz"
-          tar -czf "$ARCHIVE" -C release-kit compose.yaml .env.example
+          tar -czf "$ARCHIVE" -C release-kit compose.yaml .env.example update-fileserver.sh
           sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
 
       - name: Create GitHub Release

@@ -115,6 +115,31 @@ the first administrator. After setup, keep both secrets in the server's secret
 management system. The bootstrap token cannot create another first
 administrator after initialization.
 
+## Update a Linux installation
+
+Deployment kits include `update-fileserver.sh`. Run it from an existing
+installation with the exact stable version to install; do not include the
+leading `v`:
+
+```bash
+cd /opt/baharsoft-fileserver
+./update-fileserver.sh 1.1.0
+```
+
+The updater downloads that version's deployment kit and checksum from the
+official GitHub release, verifies the archive, and validates the new Compose
+configuration. It preserves the installation's `.env` settings while changing
+`FILESERVER_VERSION`, installs the release's current `compose.yaml`,
+`.env.example`, and updater, pulls the pinned image, and waits for the service
+health check. Set `FILESERVER_UPDATE_HEALTH_TIMEOUT_SECONDS` to a positive
+number to override the default 180-second wait.
+
+The updater does **not** back up persistent volumes. Volume backups are a
+separate operator responsibility and are required before every upgrade whose
+release notes include a schema change. Back up all three volumes as one
+consistent set before running the updater; a rollback across a schema change
+also requires restoring the matching pre-upgrade volume backup.
+
 ## Nginx HTTPS reverse proxy
 
 With the default local binding, an Nginx virtual host can proxy a generic
@@ -195,10 +220,10 @@ The named volumes remain available for the next start.
 ## Upgrade and rollback
 
 1. Read the target release notes and back up all persistent volumes.
-2. Download and verify the target release deployment kit.
-3. Set `FILESERVER_VERSION` in `.env` to the exact target version.
-4. Run `docker compose pull` and `docker compose up -d --wait`.
-5. Verify `/health/ready`, the administrator console, and one application
+2. Run `./update-fileserver.sh VERSION`; it verifies the deployment kit, updates
+   `FILESERVER_VERSION`, installs the current Compose file, pulls the image, and
+   waits for health.
+3. Verify `/health/ready`, the administrator console, and one application
    upload/download flow.
 
 An older image refuses to open metadata created by a newer schema. Rollback
