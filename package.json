@@ -1,0 +1,53 @@
+{
+  "name": "baharsoft-fileserver",
+  "version": "1.0.0",
+  "description": "Open-source, self-hosted, multi-tenant document storage service",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "check": "node scripts/check-syntax.js",
+    "test": "node --test test/*.test.js",
+    "verify": "npm run check && npm test",
+    "verify:full": "npm run verify && npm audit --omit=dev",
+    "admin:install": "npm --prefix admin-ui install",
+    "admin:dev": "npm --prefix admin-ui run dev",
+    "admin:build": "npm --prefix admin-ui run build",
+    "admin:smoke": "node scripts/smoke-admin.js",
+    "smoke": "node scripts/smoke-local.js",
+    "client:create": "node scripts/manage-client.js create",
+    "client:update": "node scripts/manage-client.js update",
+    "client:rotate": "node scripts/manage-client.js rotate",
+    "client:enable": "node scripts/manage-client.js enable",
+    "client:disable": "node scripts/manage-client.js disable",
+    "client:list": "node scripts/manage-client.js list"
+  },
+  "keywords": [
+    "document-storage",
+    "file-server",
+    "multi-tenant",
+    "self-hosted",
+    "docker"
+  ],
+  "author": "Baharsoft",
+  "license": "ISC",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/arouzbehani/baharsoft-fileserver.git"
+  },
+  "bugs": {
+    "url": "https://github.com/arouzbehani/baharsoft-fileserver/issues"
+  },
+  "homepage": "https://github.com/arouzbehani/baharsoft-fileserver#readme",
+  "engines": {
+    "node": ">=22"
+  },
+  "dependencies": {
+    "dotenv": "^17.3.1",
+    "express": "^5.2.1",
+    "file-type": "^22.0.0",
+    "jose": "^6.2.4",
+    "mime-types": "^3.0.2",
+    "multer": "^2.1.1",
+    "sqlite3": "^6.0.1"
+  }
+}

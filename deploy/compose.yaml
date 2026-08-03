@@ -1,0 +1,45 @@
+name: baharsoft-fileserver
+
+services:
+  fileserver:
+    image: ghcr.io/arouzbehani/baharsoft-fileserver:${FILESERVER_VERSION:-1.0.0}
+    pull_policy: missing
+    init: true
+    restart: unless-stopped
+    read_only: true
+    ports:
+      - "${FILESERVER_BIND_ADDRESS:-127.0.0.1}:${FILESERVER_PORT:-3000}:3000"
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      FILESERVER_TOKEN_SIGNING_SECRET: ${FILESERVER_TOKEN_SIGNING_SECRET:?Set FILESERVER_TOKEN_SIGNING_SECRET}
+      FILESERVER_ADMIN_BOOTSTRAP_TOKEN: ${FILESERVER_ADMIN_BOOTSTRAP_TOKEN:?Set FILESERVER_ADMIN_BOOTSTRAP_TOKEN}
+      FILESERVER_TOKEN_ISSUER: ${FILESERVER_TOKEN_ISSUER:-baharsoft-fileserver}
+      FILESERVER_TOKEN_AUDIENCE: ${FILESERVER_TOKEN_AUDIENCE:-baharsoft-fileserver}
+      FILESERVER_TOKEN_TTL_SECONDS: ${FILESERVER_TOKEN_TTL_SECONDS:-300}
+      FILESERVER_ADMIN_SESSION_TTL_SECONDS: ${FILESERVER_ADMIN_SESSION_TTL_SECONDS:-28800}
+    volumes:
+      - fileserver-data:/var/lib/fileserver/data
+      - fileserver-storage:/var/lib/fileserver/storage
+      - fileserver-quarantine:/var/lib/fileserver/quarantine
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    security_opt:
+      - no-new-privileges:true
+    stop_grace_period: 15s
+    healthcheck:
+      test: ["CMD", "node", "scripts/healthcheck.js"]
+      interval: 30s
+      timeout: 5s
+      start_period: 15s
+      retries: 3
+    logging:
+      driver: json-file
+      options:
+        max-size: 10m
+        max-file: "3"
+
+volumes:
+  fileserver-data:
+  fileserver-storage:
+  fileserver-quarantine:

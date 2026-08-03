@@ -1,0 +1,9 @@
+services:
+  fileserver:
+    image: baharsoft-fileserver:local
+    pull_policy: never
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      args:
+        VERSION: local

@@ -1,0 +1,17 @@
+.git
+.github
+.env
+.env.*
+node_modules
+admin-ui/node_modules
+admin-ui/dist
+data
+storage
+logs
+test
+npm-debug.log*
+*.sqlite
+*.sqlite-*
+Dockerfile*
+deploy
+docs

@@ -1,0 +1,161 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  verify:
+    name: Verify release
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: |
+            package-lock.json
+            admin-ui/package-lock.json
+
+      - name: Validate release tag
+        id: version
+        shell: bash
+        run: |
+          if [[ ! "$GITHUB_REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+            echo "Release tags must use stable SemVer format, for example v1.2.3." >&2
+            exit 1
+          fi
+
+          VERSION="${BASH_REMATCH[1]}"
+          PACKAGE_VERSION="$(node -p "require('./package.json').version")"
+
+          if [[ "$VERSION" != "$PACKAGE_VERSION" ]]; then
+            echo "Tag version $VERSION does not match package.json version $PACKAGE_VERSION." >&2
+            exit 1
+          fi
+
+          TAG_COMMIT="$(git rev-list -n 1 "$GITHUB_REF_NAME")"
+          if ! git merge-base --is-ancestor "$TAG_COMMIT" origin/main; then
+            echo "Release tags must point to a commit contained in main." >&2
+            exit 1
+          fi
+
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+
+      - name: Install API dependencies
+        run: npm ci
+
+      - name: Verify API
+        run: npm run verify:full
+
+      - name: Install admin dependencies
+        run: npm --prefix admin-ui ci
+
+      - name: Build admin UI
+        run: npm run admin:build
+
+      - name: Validate Compose package
+        env:
+          FILESERVER_TOKEN_SIGNING_SECRET: release-signing-secret-12345678901234567890
+          FILESERVER_ADMIN_BOOTSTRAP_TOKEN: release-bootstrap-token-12345678901234567890
+        run: docker compose -f deploy/compose.yaml config --quiet
+
+  publish:
+    name: Publish release
+    needs: verify
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      contents: write
+      packages: write
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v7
+
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v4
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Generate image metadata
+        id: metadata
+        uses: docker/metadata-action@v6
+        with:
+          images: ghcr.io/${{ github.repository }}
+          flavor: latest=false
+          tags: |
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=semver,pattern={{major}}
+            type=raw,value=latest
+
+      - name: Build and publish image
+        uses: docker/build-push-action@v7
+        with:
+          context: .
+          platforms: linux/amd64,linux/arm64
+          push: true
+          build-args: VERSION=${{ needs.verify.outputs.version }}
+          tags: ${{ steps.metadata.outputs.tags }}
+          labels: ${{ steps.metadata.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          provenance: mode=max
+          sbom: true
+
+      - name: Package deployment kit
+        env:
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          mkdir release-kit
+          cp deploy/compose.yaml release-kit/compose.yaml
+          cp deploy/.env.example release-kit/.env.example
+          sed -i "s/^FILESERVER_VERSION=.*/FILESERVER_VERSION=${VERSION}/" release-kit/.env.example
+          ARCHIVE="baharsoft-fileserver-${VERSION}-deploy.tar.gz"
+          tar -czf "$ARCHIVE" -C release-kit compose.yaml .env.example
+          sha256sum "$ARCHIVE" > "${ARCHIVE}.sha256"
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.verify.outputs.version }}
+        shell: bash
+        run: |
+          ARCHIVE="baharsoft-fileserver-${VERSION}-deploy.tar.gz"
+
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" "$ARCHIVE" "${ARCHIVE}.sha256" --clobber
+          else
+            gh release create "$GITHUB_REF_NAME" "$ARCHIVE" "${ARCHIVE}.sha256" \
+              --verify-tag \
+              --title "Baharsoft File Server ${VERSION}" \
+              --generate-notes
+          fi

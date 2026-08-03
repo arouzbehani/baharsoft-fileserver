@@ -1,0 +1,14 @@
+node_modules/
+admin-ui/dist/
+admin-ui/*.tsbuildinfo
+admin-ui/vite.config.js
+admin-ui/vite.config.d.ts
+.env
+.env.*
+!.env.example
+
+# Runtime data must be mounted or provisioned at deployment time.
+storage/
+data/*.sqlite
+data/*.sqlite-*
+logs/
