@@ -57,6 +57,8 @@ export interface FileFilters {
 }
 
 let csrfToken = ""
+const adminPathSegment = window.location.pathname.split("/").filter(Boolean)[0]
+const adminApiBase = adminPathSegment ? `/${adminPathSegment}/api` : "/api"
 
 export class ApiError extends Error {
   constructor(public code: string, message: string, public status: number) {
@@ -73,7 +75,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   if (!["GET", "HEAD"].includes(method) && csrfToken) {
     headers.set("x-admin-csrf", csrfToken)
   }
-  const response = await fetch(`/admin-api${path}`, {
+  const response = await fetch(`${adminApiBase}${path}`, {
     ...init,
     headers,
     credentials: "same-origin",
@@ -120,7 +122,7 @@ export const api = {
     form.append("metadata", JSON.stringify({ tags }))
     return request<{ file: AdminFile }>(`/files/${encodeURIComponent(tenant)}/upload/${folder.split("/").map(encodeURIComponent).join("/")}?visibility=${encodeURIComponent(visibility)}`, { method: "POST", body: form })
   },
-  fileContentUrl: (file: Pick<AdminFile, "tenant" | "documentId">) => `/admin-api/files/${encodeURIComponent(file.tenant)}/${encodeURIComponent(file.documentId)}/content`,
+  fileContentUrl: (file: Pick<AdminFile, "tenant" | "documentId">) => `${adminApiBase}/files/${encodeURIComponent(file.tenant)}/${encodeURIComponent(file.documentId)}/content`,
   deleteFile: (file: Pick<AdminFile, "tenant" | "documentId">) => request(`/files/${encodeURIComponent(file.tenant)}/${encodeURIComponent(file.documentId)}`, { method: "DELETE" }),
   restoreFile: (file: Pick<AdminFile, "tenant" | "documentId">) => request(`/files/${encodeURIComponent(file.tenant)}/${encodeURIComponent(file.documentId)}/restore`, { method: "POST" }),
   purgeFile: (file: Pick<AdminFile, "tenant" | "documentId">) => request(`/files/${encodeURIComponent(file.tenant)}/${encodeURIComponent(file.documentId)}/purge`, { method: "POST" }),

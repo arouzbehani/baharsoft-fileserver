@@ -37,6 +37,23 @@ function parsePositiveInteger(value, name, fallback) {
   return parsed;
 }
 
+function parseAdminPath(value) {
+  const adminPath = String(value || "/admin").trim();
+
+  if (!/^\/[A-Za-z0-9][A-Za-z0-9_-]{2,63}$/.test(adminPath)) {
+    throw new Error(
+      "FILESERVER_ADMIN_PATH must be one URL path segment containing 3-64 letters, numbers, underscores, or hyphens",
+    );
+  }
+
+  const reservedPaths = ["/admin-api", "/auth", "/files", "/health"];
+  if (reservedPaths.includes(adminPath.toLowerCase())) {
+    throw new Error("FILESERVER_ADMIN_PATH conflicts with a reserved application route");
+  }
+
+  return adminPath;
+}
+
 function isSameOrWithin(parent, candidate) {
   const relative = path.relative(parent, candidate);
   return (
@@ -89,6 +106,7 @@ function getRuntimeConfig(env = process.env) {
     "FILESERVER_ADMIN_SESSION_TTL_SECONDS",
     28800,
   );
+  const adminPath = parseAdminPath(env.FILESERVER_ADMIN_PATH);
   const adminBootstrapToken = String(
     env.FILESERVER_ADMIN_BOOTSTRAP_TOKEN || "",
   ).trim();
@@ -143,6 +161,7 @@ function getRuntimeConfig(env = process.env) {
     tokenAudience,
     tokenTtlSeconds,
     adminSessionTtlSeconds,
+    adminPath,
     adminBootstrapToken,
     dataRoot,
     storageRoot,

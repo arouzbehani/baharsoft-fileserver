@@ -43,10 +43,32 @@ test("runtime configuration validates and resolves production settings", () => {
   assert.equal(config.tokenAudience, "baharsoft-fileserver");
   assert.equal(config.tokenTtlSeconds, 300);
   assert.equal(config.adminSessionTtlSeconds, 28800);
+  assert.equal(config.adminPath, "/admin");
   assert.equal(
     config.adminBootstrapToken,
     "a-one-time-admin-bootstrap-token-with-at-least-32-characters",
   );
+});
+
+test("runtime configuration validates a custom administrator path", () => {
+  assert.equal(
+    getRuntimeConfig(productionEnv({ FILESERVER_ADMIN_PATH: "/control-7d9f31a84c" })).adminPath,
+    "/control-7d9f31a84c",
+  );
+
+  for (const adminPath of [
+    "admin",
+    "/ab",
+    "/admin/extra",
+    "/admin-api",
+    "/files",
+    "/admin?key=value",
+  ]) {
+    assert.throws(
+      () => getRuntimeConfig(productionEnv({ FILESERVER_ADMIN_PATH: adminPath })),
+      /FILESERVER_ADMIN_PATH/,
+    );
+  }
 });
 
 test("runtime configuration requires secure internal token settings", () => {

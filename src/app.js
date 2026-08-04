@@ -8,6 +8,7 @@ const errorMiddleware = require("./middleware/error.middleware");
 const packageMetadata = require("../package.json");
 
 function createApp({
+  adminPath = "/admin",
   readinessCheck = async () => true,
   serviceVersion = packageMetadata.version,
 } = {}) {
@@ -41,16 +42,24 @@ function createApp({
   });
 
   app.use("/auth", authRoutes);
-  app.use("/admin-api", adminRoutes);
   app.use("/files", fileRoutes);
+
+  const adminApiPath = `${adminPath}/api`;
+  app.use(adminApiPath, adminRoutes);
 
   const adminDist = path.resolve(__dirname, "../admin-ui/dist");
   if (fs.existsSync(adminDist)) {
-    app.get(/^\/admin$/, (req, res) => res.redirect(308, "/admin/"));
-    app.use("/admin", express.static(adminDist, { index: false }));
-    app.get(/^\/admin\/(?!assets\/).*/, (req, res) => {
-      res.sendFile(path.join(adminDist, "index.html"));
+    const escapedAdminPath = adminPath.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    app.get(new RegExp(`^${escapedAdminPath}$`), (req, res) => {
+      res.redirect(308, `${adminPath}/`);
     });
+    app.use(adminPath, express.static(adminDist, { index: false }));
+    app.get(
+      new RegExp(`^${escapedAdminPath}/(?!assets/|api(?:/|$)).*`),
+      (req, res) => {
+        res.sendFile(path.join(adminDist, "index.html"));
+      },
+    );
   }
 
   app.use((req, res) => {

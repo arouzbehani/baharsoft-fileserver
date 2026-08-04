@@ -32,6 +32,7 @@ function New-FileServerSecret {
 
 New-FileServerSecret # FILESERVER_TOKEN_SIGNING_SECRET
 New-FileServerSecret # FILESERVER_ADMIN_BOOTSTRAP_TOKEN
+"/control-$([guid]::NewGuid().ToString('N'))" # FILESERVER_ADMIN_PATH
 ```
 
 Put the two values in `deploy/.env`. They have different purposes and must not
@@ -41,6 +42,9 @@ be the same:
 - `FILESERVER_ADMIN_BOOTSTRAP_TOKEN` authorizes only the first administrator
   setup. The first-run screen asks for this value when the container runs in
   production.
+- `FILESERVER_ADMIN_PATH` places both the administrator UI and API below one
+  installation-specific path. Keep it stable across upgrades. A non-default
+  path reduces automated scanning noise but does not replace authentication.
 
 ## Build and run from this repository
 
@@ -54,8 +58,9 @@ docker compose `
   up -d --build --wait
 ```
 
-Open `http://127.0.0.1:3000/admin/` and create the first administrator using
-the bootstrap token. To view status and logs:
+Open `http://127.0.0.1:3000/<FILESERVER_ADMIN_PATH>/` and create the first
+administrator using the bootstrap token. Do not include two slashes between
+the hostname and configured path. To view status and logs:
 
 ```powershell
 docker compose --env-file deploy\.env -f deploy\compose.yaml ps
@@ -99,6 +104,7 @@ secrets:
 ```bash
 openssl rand -base64 48
 openssl rand -base64 48
+printf '/control-%s\n' "$(openssl rand -hex 16)"
 ```
 
 Then pull and start the pinned image:
@@ -110,10 +116,12 @@ docker compose --env-file .env -f compose.yaml up -d --wait
 curl -fsS http://127.0.0.1:3000/health/ready
 ```
 
-Open `/admin/` through the HTTPS hostname and use the bootstrap token to create
-the first administrator. After setup, keep both secrets in the server's secret
-management system. The bootstrap token cannot create another first
-administrator after initialization.
+Set the third generated value as `FILESERVER_ADMIN_PATH`, then open that path
+through the HTTPS hostname and use the bootstrap token to create the first
+administrator. For example, a value of `/control-0123abcd` is opened as
+`https://files.example.com/control-0123abcd/`. After setup, keep both secrets
+in the server's secret management system. The bootstrap token cannot create
+another first administrator after initialization.
 
 ## Update a Linux installation
 
@@ -133,6 +141,10 @@ configuration. It preserves the installation's `.env` settings while changing
 `.env.example`, and updater, pulls the pinned image, and waits for the service
 health check. Set `FILESERVER_UPDATE_HEALTH_TIMEOUT_SECONDS` to a positive
 number to override the default 180-second wait.
+
+Before upgrading an installation created before configurable administrator
+paths were available, add a unique `FILESERVER_ADMIN_PATH` value to its `.env`.
+If it is omitted, the backward-compatible `/admin` default remains active.
 
 To bootstrap an installation from before deployment kits included the updater,
 copy the current `update-fileserver.sh` into the installation directory and run
