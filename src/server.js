@@ -8,6 +8,7 @@ async function start(config) {
 
     await initializeDb();
     const app = createApp({
+      adminPath: runtimeConfig.adminPath,
       readinessCheck: pingDb,
       serviceVersion: runtimeConfig.serviceVersion,
     });

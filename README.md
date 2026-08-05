@@ -40,10 +40,13 @@ The default address is `http://localhost:3000`.
 
 ## Administration console
 
-The administrator console is available at `http://localhost:3000/admin/` after
-its frontend has been built. On first use, it asks you to create the local
-administrator account; afterward it provides login and service-client
-management. The first administrator can be created only once.
+The administrator console is available at
+`http://localhost:3000/<FILESERVER_ADMIN_PATH>/` after its frontend has been
+built. `FILESERVER_ADMIN_PATH` defaults to `/admin`, but production
+installations should configure a unique single-segment path. On first use, the
+console asks you to create the local administrator account; afterward it
+provides login and service-client management. The first administrator can be
+created only once.
 
 The Files workspace provides generic operational control across configured
 tenants. Administrators can filter files by lifecycle status, folder,
@@ -69,7 +72,7 @@ npm start
 npm run admin:dev
 ```
 
-Open `http://localhost:5173/admin/`. The development server proxies management
+Open `http://localhost:5173/`. The development server proxies management
 requests to the API. To build the UI and serve it from the file server instead:
 
 ```powershell

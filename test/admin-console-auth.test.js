@@ -5,6 +5,7 @@ const path = require("node:path");
 const test = require("node:test");
 
 const root = fs.mkdtempSync(path.join(os.tmpdir(), "fileserver-admin-test-"));
+const ADMIN_PATH = "/control-admin-test";
 process.env.NODE_ENV = "test";
 process.env.FILESERVER_TOKEN_SIGNING_SECRET =
   "admin-console-test-signing-secret-longer-than-thirty-two";
@@ -14,18 +15,21 @@ process.env.FILESERVER_DATA_ROOT = path.join(root, "data");
 process.env.FILESERVER_DB_PATH = path.join(root, "data", "fileserver.sqlite");
 process.env.FILESERVER_STORAGE_ROOT = path.join(root, "storage", "tenants");
 process.env.FILESERVER_QUARANTINE_ROOT = path.join(root, "data", "quarantine");
+process.env.FILESERVER_ADMIN_PATH = ADMIN_PATH;
 
 const { createApp } = require("../src/app");
 const { closeDb, initializeDb } = require("../src/db/sqlite");
 
 let server;
 let baseUrl;
+let adminApiUrl;
 
 test.before(async () => {
   await initializeDb();
-  server = createApp().listen(0);
+  server = createApp({ adminPath: ADMIN_PATH }).listen(0);
   await new Promise((resolve) => server.once("listening", resolve));
   baseUrl = `http://127.0.0.1:${server.address().port}`;
+  adminApiUrl = `${baseUrl}${ADMIN_PATH}/api`;
 });
 
 test.after(async () => {
@@ -35,13 +39,16 @@ test.after(async () => {
 });
 
 test("first-run setup creates one admin and protects client management", async () => {
-  const initial = await fetch(`${baseUrl}/admin-api/setup/status`);
+  const initial = await fetch(`${adminApiUrl}/setup/status`);
   assert.deepEqual(await initial.json(), {
     setupRequired: true,
     bootstrapRequired: true,
   });
 
-  const rejectedSetup = await fetch(`${baseUrl}/admin-api/setup`, {
+  const legacyAdminApi = await fetch(`${baseUrl}/admin-api/setup/status`);
+  assert.equal(legacyAdminApi.status, 404);
+
+  const rejectedSetup = await fetch(`${adminApiUrl}/setup`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -52,7 +59,7 @@ test("first-run setup creates one admin and protects client management", async (
   });
   assert.equal(rejectedSetup.status, 403);
 
-  const setup = await fetch(`${baseUrl}/admin-api/setup`, {
+  const setup = await fetch(`${adminApiUrl}/setup`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({
@@ -68,24 +75,24 @@ test("first-run setup creates one admin and protects client management", async (
   assert.ok(setupBody.csrfToken);
   assert.equal(setup.headers.get("cache-control"), "no-store");
 
-  const repeated = await fetch(`${baseUrl}/admin-api/setup`, {
+  const repeated = await fetch(`${adminApiUrl}/setup`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username: "another-admin", password: "another-secure-password" }),
   });
   assert.equal(repeated.status, 409);
 
-  const unauthenticated = await fetch(`${baseUrl}/admin-api/clients`);
+  const unauthenticated = await fetch(`${adminApiUrl}/clients`);
   assert.equal(unauthenticated.status, 401);
 
-  const withoutCsrf = await fetch(`${baseUrl}/admin-api/clients`, {
+  const withoutCsrf = await fetch(`${adminApiUrl}/clients`, {
     method: "POST",
     headers: { cookie, "content-type": "application/json" },
     body: JSON.stringify({}),
   });
   assert.equal(withoutCsrf.status, 403);
 
-  const created = await fetch(`${baseUrl}/admin-api/clients`, {
+  const created = await fetch(`${adminApiUrl}/clients`, {
     method: "POST",
     headers: {
       cookie,
@@ -103,7 +110,7 @@ test("first-run setup creates one admin and protects client management", async (
   const createdBody = await created.json();
   assert.match(createdBody.clientSecret, /^fs_/);
 
-  const listed = await fetch(`${baseUrl}/admin-api/clients`, {
+  const listed = await fetch(`${adminApiUrl}/clients`, {
     headers: { cookie },
   });
   assert.equal(listed.status, 200);
@@ -128,7 +135,7 @@ test("first-run setup creates one admin and protects client management", async (
     }),
   );
   const uploaded = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo/upload/documents?visibility=private`,
+    `${adminApiUrl}/files/baharsoft-demo/upload/documents?visibility=private`,
     {
       method: "POST",
       headers: { cookie, "x-admin-csrf": setupBody.csrfToken },
@@ -141,13 +148,13 @@ test("first-run setup creates one admin and protects client management", async (
   assert.match(documentId, /^[0-9a-f-]{36}$/);
   assert.equal(uploadedBody.file.uploadedBy, "admin:administrator");
 
-  const tenants = await fetch(`${baseUrl}/admin-api/tenants`, {
+  const tenants = await fetch(`${adminApiUrl}/tenants`, {
     headers: { cookie },
   });
   assert.deepEqual(await tenants.json(), { tenants: ["baharsoft-demo"] });
 
   const files = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo?search=passport&tag=documentType:passport`,
+    `${adminApiUrl}/files/baharsoft-demo?search=passport&tag=documentType:passport`,
     { headers: { cookie } },
   );
   const filesBody = await files.json();
@@ -156,14 +163,14 @@ test("first-run setup creates one admin and protects client management", async (
   assert.equal(filesBody.items[0].documentId, documentId);
 
   const content = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo/${documentId}/content`,
+    `${adminApiUrl}/files/baharsoft-demo/${documentId}/content`,
     { headers: { cookie } },
   );
   assert.equal(content.status, 200);
   assert.equal(await content.text(), "private passport content");
 
   const remove = () => fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo/${documentId}`,
+    `${adminApiUrl}/files/baharsoft-demo/${documentId}`,
     {
       method: "DELETE",
       headers: { cookie, "x-admin-csrf": setupBody.csrfToken },
@@ -172,7 +179,7 @@ test("first-run setup creates one admin and protects client management", async (
   assert.equal((await remove()).status, 200);
 
   const deleted = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo?status=deleted`,
+    `${adminApiUrl}/files/baharsoft-demo?status=deleted`,
     { headers: { cookie } },
   );
   const deletedBody = await deleted.json();
@@ -180,7 +187,7 @@ test("first-run setup creates one admin and protects client management", async (
   assert.equal(deletedBody.items[0].status, "deleted");
 
   const restored = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo/${documentId}/restore`,
+    `${adminApiUrl}/files/baharsoft-demo/${documentId}/restore`,
     {
       method: "POST",
       headers: { cookie, "x-admin-csrf": setupBody.csrfToken },
@@ -191,7 +198,7 @@ test("first-run setup creates one admin and protects client management", async (
 
   assert.equal((await remove()).status, 200);
   const purged = await fetch(
-    `${baseUrl}/admin-api/files/baharsoft-demo/${documentId}/purge`,
+    `${adminApiUrl}/files/baharsoft-demo/${documentId}/purge`,
     {
       method: "POST",
       headers: { cookie, "x-admin-csrf": setupBody.csrfToken },
@@ -200,20 +207,20 @@ test("first-run setup creates one admin and protects client management", async (
   assert.equal(purged.status, 200);
   assert.equal((await purged.json()).purged, true);
 
-  const logout = await fetch(`${baseUrl}/admin-api/logout`, {
+  const logout = await fetch(`${adminApiUrl}/logout`, {
     method: "POST",
     headers: { cookie, "x-admin-csrf": setupBody.csrfToken },
   });
   assert.equal(logout.status, 204);
 
-  const expired = await fetch(`${baseUrl}/admin-api/session`, {
+  const expired = await fetch(`${adminApiUrl}/session`, {
     headers: { cookie },
   });
   assert.equal(expired.status, 401);
 });
 
 test("existing administrator can log in", async () => {
-  const response = await fetch(`${baseUrl}/admin-api/login`, {
+  const response = await fetch(`${adminApiUrl}/login`, {
     method: "POST",
     headers: { "content-type": "application/json" },
     body: JSON.stringify({ username: "administrator", password: "a-secure-test-password" }),
