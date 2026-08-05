@@ -13,7 +13,7 @@ COPY package.json package-lock.json ./
 RUN npm ci --omit=dev && npm cache clean --force
 
 FROM node:22-trixie-slim AS runtime
-ARG VERSION=1.0.1
+ARG VERSION=1.0.2
 LABEL org.opencontainers.image.title="Baharsoft File Server" \
       org.opencontainers.image.description="Generic multi-tenant file storage service" \
       org.opencontainers.image.source="https://github.com/arouzbehani/baharsoft-fileserver" \
